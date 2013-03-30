@@ -1,0 +1,13 @@
+To run the tests you should use runtests.py. For that to work you need to create
+a config file at ~/.tryton-tests.cfg with the following sections::
+
+   [branch-name-1]
+   trytond = /path/to/trytond-1
+   proteus = /path/to/proteus-1
+
+   [branch-name-2]
+   trytond = /path/to/trytond-2
+   proteus = /path/to/proteus-2
+
+Executing runtests.py will execute the tests against all branches. If you want
+to run test against only one of them you can use the -b <branch> parameter.
