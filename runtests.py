@@ -2,6 +2,7 @@
 import subprocess
 import getpass
 import glob
+import sys
 import os
 import re
 import optparse
@@ -9,11 +10,12 @@ import ConfigParser
 from datetime import datetime
 
 parser = optparse.OptionParser()
-parser.add_option("-b", "--branch", dest="branch", help="specify branch")
-parser.add_option("-s", "--sqlite-only", action='store_true',
+parser.add_option('-b', '--branch', dest='branch', help='specify branch')
+parser.add_option('-s', '--sqlite-only', action='store_true',
     dest='sqlite_only')
-parser.add_option("-p", "--pgsql-only", action='store_true', dest='pgsql_only')
-parser.add_option("-c", "--coverage", action='store_true', dest='coverage')
+parser.add_option('-p', '--pgsql-only', action='store_true', dest='pgsql_only')
+parser.add_option('-c', '--coverage', action='store_true', dest='coverage')
+parser.add_option('-l', '--list', action='store_true', dest='list')
 
 (options, _) = parser.parse_args()
 
@@ -28,6 +30,7 @@ def get_settings(parser):
             settings[usection][name] = value
     return settings
 
+
 exec_path = os.getcwd()
 menu_path = os.path.split(__file__)[0]
 rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
@@ -36,6 +39,10 @@ parser = ConfigParser.ConfigParser()
 parser.read(rc_path)
 settings = get_settings(parser)
 
+if options.list:
+    for branch in settings.keys():
+        print branch
+    sys.exit(0)
 
 def html_filename(branch, config):
     filename = '%s-%s-coverage' % (branch, config)

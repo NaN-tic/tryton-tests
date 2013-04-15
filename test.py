@@ -7,12 +7,9 @@ import getpass
 import sys
 import optparse
 import functools
-from coverage import coverage
 import os
 import shutil
-
-sys.path.insert(0, 'trytond')
-from trytond.config import CONFIG
+from coverage import coverage
 
 options = {}
 parser = optparse.OptionParser()
@@ -32,6 +29,16 @@ if opt.name:
 else:
     options['name'] = None
 options['coverage'] = opt.coverage
+
+if options['coverage']:
+    # If coverage is enabled we want to start
+    # it before any trytond imports
+    cov = coverage()
+    cov.start()
+
+sys.path.insert(0, 'trytond')
+from trytond.config import CONFIG
+
 
 CONFIG.update_etc(options['configfile'])
 update_etc = functools.partial(CONFIG.update_etc, options['configfile'])
@@ -61,10 +68,9 @@ suite = test_tryton.modules_suite()
 suite.addTests(proteus.tests.test_suite())
 #suite = proteus.tests.test_suite()
 
+runner.run(suite)
+
 if options['coverage']:
-    cov = coverage()
-    cov.start()
-    runner.run(suite)
     cov.stop()
     cov.save()
     if os.path.exists('coverage'):
@@ -74,6 +80,4 @@ if options['coverage']:
     directory = '%s/%s-coverage' % (path, basename)
     if os.path.exists(directory):
         shutil.move('coverage', directory)
-else:
-    runner.run(suite)
 
