@@ -16,95 +16,17 @@ parser.add_option('-s', '--sqlite-only', action='store_true',
 parser.add_option('-p', '--pgsql-only', action='store_true', dest='pgsql_only')
 parser.add_option('-c', '--coverage', action='store_true', dest='coverage')
 parser.add_option('-l', '--list', action='store_true', dest='list')
+parser.add_option('-f', '--flakes-only', action='store_true',
+    dest='flakes_only')
 
 (options, _) = parser.parse_args()
 
+FLAKES_IGNORE_LIST = [
+    "'suite' imported but unused",
+    "used; unable to detect undefined names",
+    ]
 
-def get_settings(parser):
-    settings = {}
-    duplicates = []
-    for section in parser.sections():
-        usection = unicode(section, 'utf-8')
-        settings[usection] = {}
-        for name, value, in parser.items(section):
-            settings[usection][name] = value
-    return settings
-
-
-exec_path = os.getcwd()
-menu_path = os.path.split(__file__)[0]
-rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
-
-parser = ConfigParser.ConfigParser()
-parser.read(rc_path)
-settings = get_settings(parser)
-
-if options.list:
-    for branch in settings.keys():
-        print branch
-    sys.exit(0)
-
-def html_filename(branch, config):
-    filename = '%s-%s-coverage' % (branch, config)
-    filename = '/home/%s/public_html/%s.html' % (getpass.getuser(), filename)
-    return filename
-
-def run(args, env):
-    process = subprocess.Popen(args, env=env)
-    process.wait()
-
-def check_output(args, env=None):
-    process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    process.wait()
-    data = process.stdout.read()
-    return data
-
-def runtest(path, branch, config, env, coverage):
-    parameters = ['python', 'test.py', '--name', branch, '--config',
-            '%s.conf' % config]
-    if coverage:
-        parameters.append('--coverage')
-    run(parameters, env)
-    if not coverage:
-        return
-
-    # Process coverage information
-    output = check_output(['python-coverage', 'report'])
-    records = {}
-    total_lines = 0
-    total_covered = 0
-    for line in output.splitlines():
-        if 'trytond' in line:
-            item = re.split(' +', line)
-            filename = item[0]
-            try:
-                lines = int(item[1])
-                uncovered = int(item[2])
-            except ValueError:
-                continue
-            covered = lines - uncovered
-            key = filename
-            if key.startswith(trytond_path):
-                key = key[len(trytond_path):]
-            if not key in records:
-                records[key] = (0, 0)
-            lines += records[key][0]
-            covered += records[key][1]
-            if lines == 0.0:
-                coverage = 100.0
-            else:
-                coverage = 100.0 * float(covered) / float(lines)
-            records[key] = (lines, covered, coverage)
-            total_lines += lines
-            total_covered += covered
-
-    if total_lines == 0.0:
-        coverage = 100
-    else:
-        coverage = 100 * float(total_covered) / float(total_lines)
-
-    style = """
+STYLE = """
 <style type="text/css" media="screen">
 body        { font-family: verdana, arial, helvetica, sans-serif; font-size: 80%; }
 table       { font-size: 100%; }
@@ -165,6 +87,92 @@ h1 {
 </style>
 """
 
+
+def get_settings(parser):
+    settings = {}
+    duplicates = []
+    for section in parser.sections():
+        usection = unicode(section, 'utf-8')
+        settings[usection] = {}
+        for name, value, in parser.items(section):
+            settings[usection][name] = value
+    return settings
+
+
+exec_path = os.getcwd()
+menu_path = os.path.split(__file__)[0]
+rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
+
+parser = ConfigParser.ConfigParser()
+parser.read(rc_path)
+settings = get_settings(parser)
+
+if options.list:
+    for branch in settings.keys():
+        print branch
+    sys.exit(0)
+
+def html_filename(branch, config):
+    filename = '%s-%s' % (branch, config)
+    filename = '/home/%s/public_html/%s.html' % (getpass.getuser(), filename)
+    return filename
+
+def run(args, env):
+    process = subprocess.Popen(args, env=env)
+    process.wait()
+
+def check_output(args, env=None):
+    process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+    process.wait()
+    data = process.stdout.read()
+    return data
+
+def runtest(path, branch, config, env, coverage):
+    parameters = ['python', 'test.py', '--name', branch, '--config',
+            '%s.conf' % config]
+    if coverage:
+        parameters.append('--coverage')
+    run(parameters, env)
+    if not coverage:
+        return
+
+    # Process coverage information
+    output = check_output(['python-coverage', 'report'])
+    records = {}
+    total_lines = 0
+    total_covered = 0
+    for line in output.splitlines():
+        if 'trytond' in line:
+            item = re.split(' +', line)
+            filename = item[0]
+            try:
+                lines = int(item[1])
+                uncovered = int(item[2])
+            except ValueError:
+                continue
+            covered = lines - uncovered
+            key = filename
+            if key.startswith(trytond_path):
+                key = key[len(trytond_path):]
+            if not key in records:
+                records[key] = (0, 0)
+            lines += records[key][0]
+            covered += records[key][1]
+            if lines == 0.0:
+                coverage = 100.0
+            else:
+                coverage = 100.0 * float(covered) / float(lines)
+            records[key] = (lines, covered, coverage)
+            total_lines += lines
+            total_covered += covered
+
+    if total_lines == 0.0:
+        coverage = 100
+    else:
+        coverage = 100 * float(total_covered) / float(total_lines)
+
+
     # Create HTML report
     header =  '<tr id="header_row">'
     header += '<th>Module</th>'
@@ -180,7 +188,7 @@ h1 {
     row += '<td align="right">%(coverage).2f</td>'
     row += '</tr>'
 
-    rows = '' 
+    rows = ''
     for key in sorted(records.keys()):
         record = records[key]
         if record[2] >= 80:
@@ -206,7 +214,7 @@ h1 {
 
     table = '<table id="result_table">%s%s%s</table>' % (header, rows, footer)
     html = '<html>'
-    html += style
+    html += STYLE
     html += '<body>'
     title = 'Tryton unittest %s' % env
     html += '<title>%s</title>' % title
@@ -214,7 +222,7 @@ h1 {
     html += table
     html += '</body></html>'
 
-    f = open(html_filename(branch, config), 'w')
+    f = open(html_filename(branch, '%s-coverage' % config), 'w')
     f.write(html)
     f.close()
 
@@ -222,10 +230,86 @@ h1 {
     #print "TOTAL COVERED:", total_covered
     #print "COVERAGE: %.2f" % coverage
 
+def runflakes(trytond_path, branch):
+    row =  '<tr class="%(class)s">'
+    row += '<td>%(module)s</td>'
+    row += '<td>%(output)s</td>'
+    row += '<td>%(url)s</td>'
+    row += '</tr>'
 
-#path = '/home/albert/d/tryton/master/server'
-#proteus_path = '/home/albert/d/tryton/master/proteus'
-#for trytond_path in glob.glob(os.path.join(path, '*')):
+    total_modules = 0
+    total_errors = 0
+    rows = ''
+    path = '%s/trytond/modules' % trytond_path
+    dirs = []
+    for f in sorted(os.listdir(path)):
+        p = '%s/%s' % (path, f)
+        if not os.path.isdir(p):
+            continue
+        dirs.append(p)
+    for d in dirs:
+        parameters = ['pyflakes', d]
+        output = check_output(parameters)
+        module = os.path.basename(d)
+        try:
+            url = open('%s/.hg/hgrc' % d,'r').readlines()
+            url = url[1].strip('\n').split(' ')[2]
+        except IOError:
+            url = ''
+
+        # Discard elements from ignore list
+        new = []
+        for x in output.split('\n'):
+            add = True
+            for ignore in FLAKES_IGNORE_LIST:
+                if ignore in x:
+                    add = False
+                    break
+            if add:
+                new.append(x)
+        output = '\n'.join(new)
+
+        if not output:
+            cls = 'passClass'
+        else:
+            cls = 'errorClass'
+        output = '<pre>%s</pre>' % output
+        rows += row % {
+            'class': cls,
+            'module': module,
+            'output': output,
+            'url': url,
+            }
+        total_modules += 1
+        total_errors += len(output.split('\n'))
+
+    header =  '<tr id="header_row">'
+    header += '<th>Module</th>'
+    header += '<th>Output</th>'
+    header += '<th>URL</th>'
+    header += '</tr>'
+
+    footer =  '<tr>'
+    footer += '<th>Modules: %d</th>' % total_modules
+    footer += '<th>Errors: %d</th>' % total_errors
+    footer += '<th></th>'
+    footer += '</tr>'
+
+    table = '<table id="result_table">%s%s%s</table>' % (header, rows, footer)
+    html = "<html>"
+    html += STYLE
+    html += "<body>"
+    title = 'pyflakes on branch %s' % env
+    html += '<title>%s</title>' % title
+    html += '<br/>'
+    html += table
+    html += '</body></html>'
+
+    f = open(html_filename(branch, 'flakes'), 'w')
+    f.write(html)
+    f.close()
+
+
 for branch, values in settings.iteritems():
     if options.branch and branch != options.branch:
         continue
@@ -241,6 +325,9 @@ for branch, values in settings.iteritems():
     env = {
         'PYTHONPATH': ':'.join(pythonpath)
         }
+    runflakes(trytond_path, branch, )
+    if options.flakes_only:
+        continue
     if not options.pgsql_only:
         runtest(trytond_path, branch, 'sqlite', env, options.coverage)
     if not options.sqlite_only:
