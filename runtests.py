@@ -1,7 +1,6 @@
 #!/usr/bin/python
 import subprocess
 import getpass
-import glob
 import sys
 import os
 import re
@@ -28,11 +27,12 @@ FLAKES_IGNORE_LIST = [
 
 STYLE = """
 <style type="text/css" media="screen">
-body        { font-family: verdana, arial, helvetica, sans-serif; font-size: 80%; }
+body        { font-family: verdana, arial, helvetica, sans-serif;
+font-size: 80%;}
 table       { font-size: 100%; }
 pre         { }
 
-/* -- heading ---------------------------------------------------------------------- */
+/* -- heading -------------------------------------------------------------- */
 h1 {
 }
 .heading {
@@ -50,7 +50,7 @@ h1 {
     margin-bottom: 6ex;
 }
 
-/* -- report ------------------------------------------------------------------------ */
+/* -- report --------------------------------------------------------------- */
 #show_detail_line {
     margin-top: 3ex;
     margin-bottom: 1ex;
@@ -80,7 +80,7 @@ h1 {
 .testcase   { margin-left: 2em; }
 
 
-/* -- ending ---------------------------------------------------------------------- */
+/* -- ending --------------------------------------------------------------- */
 #ending {
 }
 
@@ -90,7 +90,6 @@ h1 {
 
 def get_settings(parser):
     settings = {}
-    duplicates = []
     for section in parser.sections():
         usection = unicode(section, 'utf-8')
         settings[usection] = {}
@@ -112,21 +111,24 @@ if options.list:
         print branch
     sys.exit(0)
 
+
 def html_filename(branch, config):
     filename = '%s-%s' % (branch, config)
     filename = '/home/%s/public_html/%s.html' % (getpass.getuser(), filename)
     return filename
 
+
 def run(args, env):
     process = subprocess.Popen(args, env=env)
     process.wait()
 
+
 def check_output(args, env=None):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-    process.wait()
-    data = process.stdout.read()
+        stderr=subprocess.PIPE)
+    data, _ = process.communicate()
     return data
+
 
 def runtest(path, branch, config, env, coverage):
     parameters = ['python', 'test.py', '--name', branch, '--config',
@@ -172,16 +174,15 @@ def runtest(path, branch, config, env, coverage):
     else:
         coverage = 100 * float(total_covered) / float(total_lines)
 
-
     # Create HTML report
-    header =  '<tr id="header_row">'
+    header = '<tr id="header_row">'
     header += '<th>Module</th>'
     header += '<th align="right">Total Lines</th>'
     header += '<th align="right">Covered Lines</th>'
     header += '<th align="right">Coverage</th>'
     header += '</tr>'
 
-    row =  '<tr class="%(class)s">'
+    row = '<tr class="%(class)s">'
     row += '<td>%(module)s</td>'
     row += '<td align="right">%(lines)s</td>'
     row += '<td align="right">%(covered)s</td>'
@@ -205,7 +206,7 @@ def runtest(path, branch, config, env, coverage):
             'coverage': record[2],
             }
 
-    footer =  '<tr>'
+    footer = '<tr>'
     footer += '<th></th>'
     footer += '<th align="right">%d</th>' % total_lines
     footer += '<th align="right">%d</th>' % total_covered
@@ -230,8 +231,13 @@ def runtest(path, branch, config, env, coverage):
     #print "TOTAL COVERED:", total_covered
     #print "COVERAGE: %.2f" % coverage
 
-def runflakes(trytond_path, branch):
-    row =  '<tr class="%(class)s">'
+
+def runflakes(checker, trytond_path, branch):
+    """
+    Possible values for checker: pyflakes, flake8
+    """
+    assert checker in ('pyflakes', 'flake8')
+    row = '<tr class="%(class)s">'
     row += '<td>%(module)s</td>'
     row += '<td>%(output)s</td>'
     row += '<td>%(url)s</td>'
@@ -248,11 +254,11 @@ def runflakes(trytond_path, branch):
             continue
         dirs.append(p)
     for d in dirs:
-        parameters = ['pyflakes', d]
+        parameters = [checker, d]
         output = check_output(parameters)
         module = os.path.basename(d)
         try:
-            url = open('%s/.hg/hgrc' % d,'r').readlines()
+            url = open('%s/.hg/hgrc' % d, 'r').readlines()
             url = url[1].strip('\n').split(' ')[2]
         except IOError:
             url = ''
@@ -283,13 +289,13 @@ def runflakes(trytond_path, branch):
         total_modules += 1
         total_errors += len(output.split('\n'))
 
-    header =  '<tr id="header_row">'
+    header = '<tr id="header_row">'
     header += '<th>Module</th>'
     header += '<th>Output</th>'
     header += '<th>URL</th>'
     header += '</tr>'
 
-    footer =  '<tr>'
+    footer = '<tr>'
     footer += '<th>Modules: %d</th>' % total_modules
     footer += '<th>Errors: %d</th>' % total_errors
     footer += '<th></th>'
@@ -299,13 +305,13 @@ def runflakes(trytond_path, branch):
     html = "<html>"
     html += STYLE
     html += "<body>"
-    title = 'pyflakes on branch %s' % env
+    title = '%s on branch %s' % (checker, env)
     html += '<title>%s</title>' % title
     html += '<br/>'
     html += table
     html += '</body></html>'
 
-    f = open(html_filename(branch, 'flakes'), 'w')
+    f = open(html_filename(branch, checker), 'w')
     f.write(html)
     f.close()
 
@@ -325,7 +331,8 @@ for branch, values in settings.iteritems():
     env = {
         'PYTHONPATH': ':'.join(pythonpath)
         }
-    runflakes(trytond_path, branch, )
+    runflakes('pyflakes', trytond_path, branch)
+    runflakes('flake8', trytond_path, branch)
     if options.flakes_only:
         continue
     if not options.pgsql_only:
