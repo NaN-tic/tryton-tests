@@ -17,6 +17,11 @@ parser.add_option('-c', '--coverage', action='store_true', dest='coverage')
 parser.add_option('-l', '--list', action='store_true', dest='list')
 parser.add_option('-f', '--flakes-only', action='store_true',
     dest='flakes_only')
+parser.add_option('-u', '--unittest-only', action='store_true',
+    dest='unittest_only')
+parser.add_option('', '--failfast', action='store_true',
+    dest='failfast')
+parser.add_option('', '--fetch', action='store_true', dest='fetch')
 
 (options, _) = parser.parse_args()
 
@@ -112,16 +117,14 @@ if options.list:
     sys.exit(0)
 
 
-def html_filename(branch, config):
+def html_filename(output_path, branch, config):
     filename = '%s-%s' % (branch, config)
-    filename = '/home/%s/public_html/%s.html' % (getpass.getuser(), filename)
+    filename = '%s/%s.html' % (output_path, filename)
     return filename
-
 
 def run(args, env):
     process = subprocess.Popen(args, env=env)
     process.wait()
-
 
 def check_output(args, env=None):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
@@ -129,10 +132,11 @@ def check_output(args, env=None):
     data, _ = process.communicate()
     return data
 
-
-def runtest(path, branch, config, env, coverage):
+def runtest(path, branch, config, env, coverage, output_path, failfast=False):
     parameters = ['python', 'test.py', '--name', branch, '--config',
-            '%s.conf' % config]
+            '%s.conf' % config, '--output', output_path]
+    if failfast:
+        parameters.append('--failfast')
     if coverage:
         parameters.append('--coverage')
     run(parameters, env)
@@ -223,7 +227,7 @@ def runtest(path, branch, config, env, coverage):
     html += table
     html += '</body></html>'
 
-    f = open(html_filename(branch, '%s-coverage' % config), 'w')
+    f = open(html_filename(output_path, branch, '%s-coverage' % config), 'w')
     f.write(html)
     f.close()
 
@@ -232,7 +236,7 @@ def runtest(path, branch, config, env, coverage):
     #print "COVERAGE: %.2f" % coverage
 
 
-def runflakes(checker, trytond_path, branch):
+def runflakes(checker, trytond_path, branch, output_path):
     """
     Possible values for checker: pyflakes, flake8
     """
@@ -311,9 +315,15 @@ def runflakes(checker, trytond_path, branch):
     html += table
     html += '</body></html>'
 
-    f = open(html_filename(branch, checker), 'w')
+    f = open(html_filename(output_path, branch, checker), 'w')
     f.write(html)
     f.close()
+
+def fetch():
+    BUILDOUT_URL = 'ssh://hg@bitbucket.org/nantic/tryton-buildout'
+    check_output(['hg', 'clone', URL, destination])
+    check_output(['hg', 'clone', BUILDOUT_URL, '%s/buildout' % destination])
+    check_output([])
 
 
 for branch, values in settings.iteritems():
@@ -331,11 +341,18 @@ for branch, values in settings.iteritems():
     env = {
         'PYTHONPATH': ':'.join(pythonpath)
         }
-    runflakes('pyflakes', trytond_path, branch)
-    runflakes('flake8', trytond_path, branch)
+    if values.get('output'):
+        output_path = values['output']
+    else:
+        output_path = '/home/%s/public_html' % getpass.getuser()
+    if not options.unittest_only:
+        runflakes('pyflakes', trytond_path, branch, output_path)
+        runflakes('flake8', trytond_path, branch, output_path)
     if options.flakes_only:
         continue
     if not options.pgsql_only:
-        runtest(trytond_path, branch, 'sqlite', env, options.coverage)
+        runtest(trytond_path, branch, 'sqlite', env, options.coverage,
+            output_path, options.failfast)
     if not options.sqlite_only:
-        runtest(trytond_path, branch, 'postgres', env, options.coverage)
+        runtest(trytond_path, branch, 'postgres', env, options.coverage,
+            output_path, options.failfast)

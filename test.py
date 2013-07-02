@@ -18,6 +18,10 @@ parser.add_option("-c", "--config", dest="config",
 parser.add_option("-n", "--name", dest="name",
     help="name to add to output file")
 parser.add_option('', '--coverage', action='store_true', dest='coverage')
+parser.add_option('', '--output', dest="output",
+    help="directory where files should be stored to")
+parser.add_option('', '--failfast', action='store_true', dest='failfast',
+    help="stop after the first error or failure")
 (opt, _) = parser.parse_args()
 if opt.config:
     options['configfile'] = opt.config
@@ -29,6 +33,7 @@ if opt.name:
 else:
     options['name'] = None
 options['coverage'] = opt.coverage
+options['failfast'] = opt.failfast
 
 if options['coverage']:
     # If coverage is enabled we want to start
@@ -55,18 +60,21 @@ basename = ''
 if options['name']:
     basename += options['name'] + "-"
 basename += CONFIG['db_type']
-path = '/home/%s/public_html' % getpass.getuser()
-filename = '/home/%s/public_html/%s.html' % (getpass.getuser(), basename)
+if options.get('output'):
+    path = options['output']
+else:
+    path = '/home/%s/public_html' % getpass.getuser()
+filename = '%s/%s.html' % (path, basename)
 title = 'Tryton unittest %s' % CONFIG['db_type']
 
 fp = file(filename, 'wb')
 runner = HTMLTestRunner.HTMLTestRunner(
         stream=fp,
         title=title,
+        failfast=options.get('failfast', False)
         )
 suite = test_tryton.modules_suite()
 suite.addTests(proteus.tests.test_suite())
-#suite = proteus.tests.test_suite()
 
 runner.run(suite)
 

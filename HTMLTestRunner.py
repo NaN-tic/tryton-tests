@@ -464,7 +464,7 @@ class _TestResult(TestResult):
     # note: _TestResult is a pure representation of results.
     # It lacks the output and reporting ability compares to unittest._TextTestResult.
 
-    def __init__(self, verbosity=1):
+    def __init__(self, verbosity=1, failfast=False):
         TestResult.__init__(self)
         self.stdout0 = None
         self.stderr0 = None
@@ -472,6 +472,7 @@ class _TestResult(TestResult):
         self.failure_count = 0
         self.error_count = 0
         self.verbosity = verbosity
+        self.failfast = failfast
 
         # result is a list of result in 4 tuple
         # (
@@ -539,6 +540,8 @@ class _TestResult(TestResult):
             sys.stderr.write('\n')
         else:
             sys.stderr.write('E')
+        if self.failfast:
+            self.stop()
 
     def addFailure(self, test, err):
         self.failure_count += 1
@@ -552,14 +555,18 @@ class _TestResult(TestResult):
             sys.stderr.write('\n')
         else:
             sys.stderr.write('F')
+        if self.failfast:
+            self.stop()
 
 
 class HTMLTestRunner(Template_mixin):
     """
     """
-    def __init__(self, stream=sys.stdout, verbosity=1, title=None, description=None):
+    def __init__(self, stream=sys.stdout, verbosity=1, title=None,
+            description=None, failfast=False):
         self.stream = stream
         self.verbosity = verbosity
+        self.failfast = failfast
         if title is None:
             self.title = self.DEFAULT_TITLE
         else:
@@ -574,7 +581,7 @@ class HTMLTestRunner(Template_mixin):
 
     def run(self, test):
         "Run the given test case or test suite."
-        result = _TestResult(self.verbosity)
+        result = _TestResult(self.verbosity, failfast=self.failfast)
         test(result)
         self.stopTime = datetime.datetime.now()
         self.generateReport(test, result)
