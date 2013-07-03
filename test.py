@@ -9,7 +9,7 @@ import optparse
 import functools
 import os
 import shutil
-from coverage import coverage
+    
 
 options = {}
 parser = optparse.OptionParser()
@@ -38,6 +38,7 @@ options['failfast'] = opt.failfast
 if options['coverage']:
     # If coverage is enabled we want to start
     # it before any trytond imports
+    from coverage import coverage
     cov = coverage()
     cov.start()
 
