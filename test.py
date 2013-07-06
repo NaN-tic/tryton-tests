@@ -33,6 +33,7 @@ if opt.name:
 else:
     options['name'] = None
 options['coverage'] = opt.coverage
+options['output'] = opt.output
 options['failfast'] = opt.failfast
 
 if options['coverage']:
