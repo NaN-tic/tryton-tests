@@ -6,6 +6,7 @@ import os
 import re
 import optparse
 import ConfigParser
+import tempfile
 from datetime import datetime
 
 parser = optparse.OptionParser()
@@ -21,7 +22,6 @@ parser.add_option('-u', '--unittest-only', action='store_true',
     dest='unittest_only')
 parser.add_option('', '--failfast', action='store_true',
     dest='failfast')
-parser.add_option('', '--fetch', action='store_true', dest='fetch')
 
 (options, _) = parser.parse_args()
 
@@ -228,8 +228,10 @@ def runtest(path, branch, config, env, coverage, output_path, failfast=False):
     html += '</body></html>'
 
     f = open(html_filename(output_path, branch, '%s-coverage' % config), 'w')
-    f.write(html)
-    f.close()
+    try:
+        f.write(html)
+    finally:
+        f.close()
 
     #print "TOTAL LINES:", total_lines
     #print "TOTAL COVERED:", total_covered
@@ -316,19 +318,46 @@ def runflakes(checker, trytond_path, branch, output_path):
     html += '</body></html>'
 
     f = open(html_filename(output_path, branch, checker), 'w')
-    f.write(html)
-    f.close()
+    try:
+        f.write(html)
+    finally:
+        f.close()
 
-def fetch():
-    BUILDOUT_URL = 'ssh://hg@bitbucket.org/nantic/tryton-buildout'
-    check_output(['hg', 'clone', URL, destination])
-    check_output(['hg', 'clone', BUILDOUT_URL, '%s/buildout' % destination])
-    check_output([])
-
+def fetch(url, output_path, branch):
+    test_dir=tempfile.mkdtemp()
+    cwd = os.getcwd()
+    print 'Cloning %s into %s' % (url, test_dir)
+    check_output(['hg', 'clone', url, test_dir])
+    os.chdir(test_dir)
+    try:
+        output = check_output(['./bootstrap.sh'])
+    finally:
+        os.chdir(cwd)
+    f = open(html_filename(output_path, branch, 'fetch'), 'w')
+    try:
+        f.write('<html><body>')
+        f.write('<title>Cloning %s into %s</title>' % (url, test_dir))
+        f.write('<pre>')
+        f.write(output)
+        f.write('</pre>')
+        f.write('</body></html>')
+    finally:
+        f.close()
+    # TODO: Currently we have hardcoded trytond and proteus subdirs
+    return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus')
 
 for branch, values in settings.iteritems():
     if options.branch and branch != options.branch:
         continue
+    if values.get('output'):
+        output_path = values['output']
+    else:
+        output_path = '/home/%s/public_html' % getpass.getuser()
+
+    if values.get('url'):
+        values['trytond'], values['proteus'] = fetch(values['url'], output_path,
+            branch)
+
     trytond_path = values['trytond']
     if not os.path.isdir(trytond_path):
         continue
@@ -341,10 +370,6 @@ for branch, values in settings.iteritems():
     env = {
         'PYTHONPATH': ':'.join(pythonpath)
         }
-    if values.get('output'):
-        output_path = values['output']
-    else:
-        output_path = '/home/%s/public_html' % getpass.getuser()
     if not options.unittest_only:
         runflakes('pyflakes', trytond_path, branch, output_path)
         runflakes('flake8', trytond_path, branch, output_path)
