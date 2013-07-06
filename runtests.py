@@ -126,10 +126,12 @@ def run(args, env):
     process = subprocess.Popen(args, env=env)
     process.wait()
 
-def check_output(args, env=None):
+def check_output(args, env=None, errors=False):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
-    data, _ = process.communicate()
+    data, stderr = process.communicate()
+    if errors:
+        data += '-' * 50 + '\n' + stderr
     return data
 
 def runtest(path, branch, config, env, coverage, output_path, failfast=False):
@@ -327,20 +329,20 @@ def fetch(url, output_path, branch):
     test_dir=tempfile.mkdtemp()
     cwd = os.getcwd()
     print 'Cloning %s into %s' % (url, test_dir)
-    check_output(['hg', 'clone', url, test_dir])
+    output = check_output(['hg', 'clone', url, test_dir], errors=True)
     os.chdir(test_dir)
     try:
-        output = check_output(['./bootstrap.sh'])
+        output += check_output(['./bootstrap.sh'], errors=True)
     finally:
         os.chdir(cwd)
     f = open(html_filename(output_path, branch, 'fetch'), 'w')
     try:
         f.write('<html><body>')
         f.write('<title>Cloning %s into %s</title>' % (url, test_dir))
-        f.write('<pre>')
+        f.write('<pre>\n')
         f.write(output)
-        f.write('</pre>')
-        f.write('</body></html>')
+        f.write('\n</pre>')
+        f.write('</body></html>\n')
     finally:
         f.close()
     # TODO: Currently we have hardcoded trytond and proteus subdirs
