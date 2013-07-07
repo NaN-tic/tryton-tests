@@ -8,6 +8,4 @@ fi
 key=$1
 echo "${*:2}"
 
-ssh-agent
-ssh-add $key
-./runtests.py $*
+ssh-agent /bin/bash -c "ssh-add $key && ./runtests.py $*"
