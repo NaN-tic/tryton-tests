@@ -329,10 +329,17 @@ def fetch(url, output_path, branch):
     test_dir=tempfile.mkdtemp()
     cwd = os.getcwd()
     print 'Cloning %s into %s' % (url, test_dir)
-    output = check_output(['hg', 'clone', url, test_dir], errors=True)
+    output = 'Cloning %s into %s\n' % (url, test_dir)
+    try:
+        output += check_output(['hg', 'clone', url, test_dir], errors=True)
+    except Exception, e:
+        output += 'Error running hg clone: ' + str(e) + '\n'
     os.chdir(test_dir)
+    output += '\nRunninig ./bootstrap.sh\n'
     try:
         output += check_output(['./bootstrap.sh'], errors=True)
+    except Exception, e:
+        output += '\nError runnig ./bootstrap.sh:\n' + str(e) + '\n'
     finally:
         os.chdir(cwd)
     f = open(html_filename(output_path, branch, 'fetch'), 'w')
