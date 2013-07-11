@@ -362,6 +362,9 @@ for branch, values in settings.iteritems():
         output_path = values['output']
     else:
         output_path = '/home/%s/public_html' % getpass.getuser()
+    if values.get('add_timestamp'):
+        output_path = os.path.join(output_path, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
+        os.mkdir(output_path)
 
     if values.get('url'):
         values['trytond'], values['proteus'] = fetch(values['url'], output_path,
