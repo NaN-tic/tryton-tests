@@ -83,11 +83,8 @@ runner.run(suite)
 if options['coverage']:
     cov.stop()
     cov.save()
-    if os.path.exists('coverage'):
-        shutil.rmtree('coverage')
-    cov.html_report(directory='%s/coverage' % path, title=title,
+    coverage_dir = '%s/%s-coverage' % (path, CONFIG['db_type'])
+    if os.path.exists(coverage_dir):
+        shutil.rmtree(coverage_dir)
+    cov.html_report(directory=coverage_dir, title=title,
         ignore_errors=True)
-    directory = '%s/%s-coverage' % (path, basename)
-    if os.path.exists(directory):
-        shutil.move('coverage', directory)
-
