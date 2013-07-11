@@ -136,11 +136,13 @@ def check_output(args, env=None, errors=False):
 
 def runtest(path, branch, config, env, coverage, output_path, failfast=False):
     parameters = ['python', 'test.py', '--name', branch, '--config',
-            '%s.conf' % config, '--output', output_path]
+        '%s.conf' % config, '--output', output_path]
     if failfast:
         parameters.append('--failfast')
     if coverage:
         parameters.append('--coverage')
+        parameters.append('--coverage-dir')
+        parameters.append('%s-%s-coverage' % (branch, config))
     run(parameters, env)
     if not coverage:
         return

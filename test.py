@@ -18,6 +18,7 @@ parser.add_option("-c", "--config", dest="config",
 parser.add_option("-n", "--name", dest="name",
     help="name to add to output file")
 parser.add_option('', '--coverage', action='store_true', dest='coverage')
+parser.add_option('', '--coverage-dir', dest='coverage_dir')
 parser.add_option('', '--output', dest="output",
     help="directory where files should be stored to")
 parser.add_option('', '--failfast', action='store_true', dest='failfast',
@@ -33,6 +34,7 @@ if opt.name:
 else:
     options['name'] = None
 options['coverage'] = opt.coverage
+options['coverage_dir'] = opt.coverage_dir
 options['output'] = opt.output
 options['failfast'] = opt.failfast
 
@@ -83,7 +85,12 @@ runner.run(suite)
 if options['coverage']:
     cov.stop()
     cov.save()
-    coverage_dir = '%s/%s-coverage' % (path, CONFIG['db_type'])
+    if options.get('coverage_dir'):
+        coverage_dir = options['coverage_dir']
+        if not coverage_dir.startswith('/'):
+            coverage_dir = '%s/%s' % (path, coverage_dir)
+    else:
+        coverage_dir = '%s/%s-coverage' % (path, CONFIG['db_type'])
     if os.path.exists(coverage_dir):
         shutil.rmtree(coverage_dir)
     cov.html_report(directory=coverage_dir, title=title,
