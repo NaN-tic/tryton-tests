@@ -8,6 +8,7 @@ import optparse
 import ConfigParser
 import tempfile
 from datetime import datetime
+from StringIO import StringIO
 
 parser = optparse.OptionParser()
 parser.add_option('-b', '--branch', dest='branch', help='specify branch')
@@ -148,7 +149,12 @@ def runtest(path, branch, config, env, coverage, output_path, failfast=False):
         return
 
     # Process coverage information
-    output = check_output(['python-coverage', 'report'])
+    from coverage import coverage
+    f = StringIO()
+    cov = coverage()
+    cov.load()
+    cov.report(file=f, show_missing=False)
+    output = f.getvalue()
     records = {}
     total_lines = 0
     total_covered = 0
