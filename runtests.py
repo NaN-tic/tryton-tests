@@ -8,6 +8,7 @@ import optparse
 import ConfigParser
 import tempfile
 from datetime import datetime
+from email.mime.text import MIMEText
 from StringIO import StringIO
 
 parser = optparse.OptionParser()
@@ -116,6 +117,19 @@ if options.list:
     for branch in settings.keys():
         print branch
     sys.exit(0)
+
+
+def send_mail(subject, body, env=None):
+    msg = MIMEText(body)
+    msg["From"] = "tests@nan-tic.com"
+    msg["To"] = "intern@nan-tic.com"
+    msg["Subject"] = subject
+
+    print "sending mail '%s'" % subject
+    process = subprocess.Popen(["/usr/bin/mail", "-t"], env=env,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    data, stderr = process.communicate(msg.as_string())
+    print "send_mail(subject=%s): data=%s, stderr=%s" % (subject, data, stderr)
 
 
 def html_filename(output_path, branch, config):
@@ -333,8 +347,9 @@ def runflakes(checker, trytond_path, branch, output_path):
     finally:
         f.close()
 
+
 def fetch(url, output_path, branch):
-    test_dir=tempfile.mkdtemp()
+    test_dir = tempfile.mkdtemp()
     cwd = os.getcwd()
     print 'Cloning %s into %s' % (url, test_dir)
     output = 'Cloning %s into %s\n' % (url, test_dir)
@@ -342,14 +357,18 @@ def fetch(url, output_path, branch):
         output += check_output(['hg', 'clone', url, test_dir], errors=True)
     except Exception, e:
         output += 'Error running hg clone: ' + str(e) + '\n'
+        send_mail("[Tests] Error running hg clone", output)
+
     os.chdir(test_dir)
     output += '\nRunninig ./bootstrap.sh\n'
     try:
         output += check_output(['./bootstrap.sh'], errors=True)
     except Exception, e:
         output += '\nError runnig ./bootstrap.sh:\n' + str(e) + '\n'
+        send_mail("[Tests] Error running ./bootstrap.sh", output)
     finally:
         os.chdir(cwd)
+
     f = open(html_filename(output_path, branch, 'fetch'), 'w')
     try:
         f.write('<html><body>')
@@ -366,38 +385,52 @@ def fetch(url, output_path, branch):
 for branch, values in settings.iteritems():
     if options.branch and branch != options.branch:
         continue
-    if values.get('output'):
-        output_path = values['output']
+
+    now = datetime.now()
+    try:
+        if values.get('output'):
+            output_path = values['output']
+        else:
+            output_path = '/home/%s/public_html' % getpass.getuser()
+        if values.get('add_timestamp'):
+            output_path = os.path.join(output_path,
+                now.strftime('%Y-%m-%d_%H:%M:%S'))
+            os.mkdir(output_path)
+
+        if values.get('url'):
+            values['trytond'], values['proteus'] = fetch(values['url'],
+                output_path, branch)
+
+        trytond_path = values['trytond']
+        if not os.path.isdir(trytond_path):
+            continue
+
+        execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
+        print execution_name
+        pythonpath = [trytond_path]
+        if 'proteus' in values:
+            pythonpath.append(values['proteus'])
+        env = {
+            'PYTHONPATH': ':'.join(pythonpath)
+            }
+        if not options.unittest_only:
+            runflakes('pyflakes', trytond_path, branch, output_path)
+            runflakes('flake8', trytond_path, branch, output_path)
+        if options.flakes_only:
+            continue
+        if not options.pgsql_only:
+            runtest(trytond_path, branch, 'sqlite', env, options.coverage,
+                output_path, options.failfast)
+        if not options.sqlite_only:
+            runtest(trytond_path, branch, 'postgres', env, options.coverage,
+                output_path, options.failfast)
+    except Exception as e:
+        send_mail("[Tests] Error executing test %s" % execution_name,
+            "Exception %s. Maybe there is any output at "
+            "http://tests.nan-tic.com/%s (%s)" % (str(e), output_path,
+                values.get('output')))
+        raise
     else:
-        output_path = '/home/%s/public_html' % getpass.getuser()
-    if values.get('add_timestamp'):
-        output_path = os.path.join(output_path, datetime.now().strftime('%Y-%m-%d_%H:%M:%S'))
-        os.mkdir(output_path)
-
-    if values.get('url'):
-        values['trytond'], values['proteus'] = fetch(values['url'], output_path,
-            branch)
-
-    trytond_path = values['trytond']
-    if not os.path.isdir(trytond_path):
-        continue
-
-    print "%s %s" % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        branch)
-    pythonpath = [trytond_path]
-    if 'proteus' in values:
-        pythonpath.append(values['proteus'])
-    env = {
-        'PYTHONPATH': ':'.join(pythonpath)
-        }
-    if not options.unittest_only:
-        runflakes('pyflakes', trytond_path, branch, output_path)
-        runflakes('flake8', trytond_path, branch, output_path)
-    if options.flakes_only:
-        continue
-    if not options.pgsql_only:
-        runtest(trytond_path, branch, 'sqlite', env, options.coverage,
-            output_path, options.failfast)
-    if not options.sqlite_only:
-        runtest(trytond_path, branch, 'postgres', env, options.coverage,
-            output_path, options.failfast)
+        send_mail("[Tests] Successful test execution %s" % execution_name,
+            "Check the output at http://tests.nan-tic.com/%s (%s)"
+            % (output_path, values.get('output')))
