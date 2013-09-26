@@ -122,7 +122,7 @@ if options.list:
 def send_mail(subject, body, env=None):
     msg = MIMEText(body)
     msg["From"] = "tests@nan-tic.com"
-    msg["To"] = "intern@nan-tic.com"
+    msg["To"] = "suport@nan-tic.com"
     msg["Subject"] = subject
 
     print "sending mail '%s'" % subject
