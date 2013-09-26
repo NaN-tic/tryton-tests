@@ -1,15 +1,21 @@
 #!/usr/bin/python
-import subprocess
+import ConfigParser
 import getpass
-import sys
+import logging
+import optparse
 import os
 import re
-import optparse
-import ConfigParser
+import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from email.mime.text import MIMEText
 from StringIO import StringIO
+
+logging_filepath = "%s/logs/runtests.log" % os.getenv("HOME")
+logging.basicConfig(filename=logging_filepath,
+    format='[%(asctime)s] %(levelname)s:%(message)s', level=logging.DEBUG)
+logging.info("Starting execution")
 
 parser = optparse.OptionParser()
 parser.add_option('-b', '--branch', dest='branch', help='specify branch')
@@ -26,6 +32,7 @@ parser.add_option('', '--failfast', action='store_true',
     dest='failfast')
 
 (options, _) = parser.parse_args()
+logging.debug("Options for args %s: %s" % (sys.argv, options))
 
 FLAKES_IGNORE_LIST = [
     "'suite' imported but unused",
@@ -112,6 +119,7 @@ rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
 parser = ConfigParser.ConfigParser()
 parser.read(rc_path)
 settings = get_settings(parser)
+logging.debug("settings: %s" % settings)
 
 if options.list:
     for branch in settings.keys():
@@ -125,11 +133,12 @@ def send_mail(subject, body, env=None):
     msg["To"] = "suport@nan-tic.com"
     msg["Subject"] = subject
 
-    print "sending mail '%s'" % subject
+    logging.info("Sending mail '%s' to '%s'" % (subject, msg["To"]))
     process = subprocess.Popen(["/usr/bin/mail", "-t"], env=env,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     data, stderr = process.communicate(msg.as_string())
-    print "send_mail(subject=%s): data=%s, stderr=%s" % (subject, data, stderr)
+    logging.debug("send_mail(subject=%s): stderr=%s"
+        % (subject, stderr))
 
 
 def html_filename(output_path, branch, config):
@@ -145,8 +154,13 @@ def check_output(args, env=None, errors=False):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     data, stderr = process.communicate()
+    logging.debug("process %s output: stderr='%s'"
+        % (args, stderr))
     if errors:
         data += '-' * 50 + '\n' + stderr
+    if stderr:
+        logging.error("Exception executing %s:\n%s" % (args, stderr))
+        raise Exception("Exception executing %s" % args)
     return data
 
 def runtest(path, branch, config, env, coverage, output_path, failfast=False):
@@ -351,7 +365,7 @@ def runflakes(checker, trytond_path, branch, output_path):
 def fetch(url, output_path, branch):
     test_dir = tempfile.mkdtemp()
     cwd = os.getcwd()
-    print 'Cloning %s into %s' % (url, test_dir)
+    logging.info('Cloning %s into %s' % (url, test_dir))
     output = 'Cloning %s into %s\n' % (url, test_dir)
     try:
         output += check_output(['hg', 'clone', url, test_dir], errors=True)
@@ -360,12 +374,15 @@ def fetch(url, output_path, branch):
         send_mail("[Tests] Error running hg clone", output)
 
     os.chdir(test_dir)
+    logging.info('Runninig ./bootstrap.sh')
     output += '\nRunninig ./bootstrap.sh\n'
     try:
         output += check_output(['./bootstrap.sh'], errors=True)
+        logging.debug("./bootstrap.sh executed OK")
     except Exception, e:
         output += '\nError runnig ./bootstrap.sh:\n' + str(e) + '\n'
         send_mail("[Tests] Error running ./bootstrap.sh", output)
+        sys.exit('Error running ./bootstrap.sh')
     finally:
         os.chdir(cwd)
 
@@ -387,6 +404,8 @@ for branch, values in settings.iteritems():
         continue
 
     now = datetime.now()
+    logging.info("Starting runtests for branch '%s' with values '%s'"
+        % (branch, values))
     try:
         if values.get('output'):
             output_path = values['output']
@@ -397,6 +416,8 @@ for branch, values in settings.iteritems():
                 now.strftime('%Y-%m-%d_%H:%M:%S'))
             os.mkdir(output_path)
 
+        logging.debug("output_path='%s', values['url']='%s'"
+            % (output_path, values.get('url')))
         if values.get('url'):
             values['trytond'], values['proteus'] = fetch(values['url'],
                 output_path, branch)
@@ -431,6 +452,8 @@ for branch, values in settings.iteritems():
                 values.get('output')))
         raise
     else:
+        public_path = os.path.dirname(output_path)
+        if 'html' in public_path:
+            public_path = ''
         send_mail("[Tests] Successful test execution %s" % execution_name,
-            "Check the output at http://tests.nan-tic.com/%s (%s)"
-            % (output_path, values.get('output')))
+            "Check the output at http://tests.nan-tic.com/%s" % public_path)
