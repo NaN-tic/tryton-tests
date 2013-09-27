@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PATH="/usr/local/bin:$PATH"
+
 if [[ -z "$1" ]]; then
     echo "Syntax: $0 <key> <runtests.py parameters>"
     exit 1
