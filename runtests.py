@@ -130,7 +130,7 @@ if options.list:
 def send_mail(subject, body, env=None):
     msg = MIMEText(body)
     msg["From"] = "tests@nan-tic.com"
-    msg["To"] = "suport@nan-tic.com"
+    msg["To"] = "angel@nan-tic.com"
     msg["Subject"] = subject
 
     logging.info("Sending mail '%s' to '%s'" % (subject, msg["To"]))
@@ -349,7 +349,7 @@ def runflakes(checker, trytond_path, branch, output_path):
     html = "<html>"
     html += STYLE
     html += "<body>"
-    title = '%s on branch %s' % (checker, env)
+    title = '%s on branch %s' % (checker, branch)
     html += '<title>%s</title>' % title
     html += '<br/>'
     html += table
@@ -399,61 +399,62 @@ def fetch(url, output_path, branch):
     # TODO: Currently we have hardcoded trytond and proteus subdirs
     return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus')
 
-for branch, values in settings.iteritems():
-    if options.branch and branch != options.branch:
-        continue
 
-    now = datetime.now()
-    logging.info("Starting runtests for branch '%s' with values '%s'"
-        % (branch, values))
-    try:
-        if values.get('output'):
-            output_path = values['output']
+if __name__ == "__main__":
+    for branch, values in settings.iteritems():
+        if options.branch and branch != options.branch:
+            continue
+    
+        now = datetime.now()
+        logging.info("Starting runtests for branch '%s' with values '%s'"
+            % (branch, values))
+        try:
+            if values.get('output'):
+                output_path = values['output']
+            else:
+                output_path = '/home/%s/public_html' % getpass.getuser()
+            if values.get('add_timestamp'):
+                output_path = os.path.join(output_path,
+                    now.strftime('%Y-%m-%d_%H:%M:%S'))
+                os.mkdir(output_path)
+            public_path = os.path.dirname(output_path + "/")
+            if 'html' in public_path.split('/')[-1]:
+                public_path = ''
+    
+            logging.debug("output_path='%s', values['url']='%s'"
+                % (output_path, values.get('url')))
+            if values.get('url'):
+                values['trytond'], values['proteus'] = fetch(values['url'],
+                    output_path, branch)
+    
+            trytond_path = values['trytond']
+            if not os.path.isdir(trytond_path):
+                continue
+    
+            execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
+            print execution_name
+            pythonpath = [trytond_path]
+            if 'proteus' in values:
+                pythonpath.append(values['proteus'])
+            env = {
+                'PYTHONPATH': ':'.join(pythonpath)
+                }
+            if not options.unittest_only:
+                runflakes('pyflakes', trytond_path, branch, output_path)
+                runflakes('flake8', trytond_path, branch, output_path)
+            if options.flakes_only:
+                continue
+            if not options.pgsql_only:
+                runtest(trytond_path, branch, 'sqlite', env, options.coverage,
+                    output_path, options.failfast)
+            if not options.sqlite_only:
+                runtest(trytond_path, branch, 'postgres', env, options.coverage,
+                    output_path, options.failfast)
+        except Exception as e:
+            send_mail("[Tests] Error executing test %s" % execution_name,
+                "%s.\nMaybe there is any output at "
+                "http://tests.nan-tic.com/%s" % (str(e), public_path))
+            raise
         else:
-            output_path = '/home/%s/public_html' % getpass.getuser()
-        if values.get('add_timestamp'):
-            output_path = os.path.join(output_path,
-                now.strftime('%Y-%m-%d_%H:%M:%S'))
-            os.mkdir(output_path)
-
-        logging.debug("output_path='%s', values['url']='%s'"
-            % (output_path, values.get('url')))
-        if values.get('url'):
-            values['trytond'], values['proteus'] = fetch(values['url'],
-                output_path, branch)
-
-        trytond_path = values['trytond']
-        if not os.path.isdir(trytond_path):
-            continue
-
-        execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
-        print execution_name
-        pythonpath = [trytond_path]
-        if 'proteus' in values:
-            pythonpath.append(values['proteus'])
-        env = {
-            'PYTHONPATH': ':'.join(pythonpath)
-            }
-        if not options.unittest_only:
-            runflakes('pyflakes', trytond_path, branch, output_path)
-            runflakes('flake8', trytond_path, branch, output_path)
-        if options.flakes_only:
-            continue
-        if not options.pgsql_only:
-            runtest(trytond_path, branch, 'sqlite', env, options.coverage,
-                output_path, options.failfast)
-        if not options.sqlite_only:
-            runtest(trytond_path, branch, 'postgres', env, options.coverage,
-                output_path, options.failfast)
-    except Exception as e:
-        send_mail("[Tests] Error executing test %s" % execution_name,
-            "Exception %s. Maybe there is any output at "
-            "http://tests.nan-tic.com/%s (%s)" % (str(e), output_path,
-                values.get('output')))
-        raise
-    else:
-        public_path = os.path.dirname(output_path)
-        if 'html' in public_path:
-            public_path = ''
-        send_mail("[Tests] Successful test execution %s" % execution_name,
-            "Check the output at http://tests.nan-tic.com/%s" % public_path)
+            send_mail("[Tests] Successful test execution %s" % execution_name,
+                "Check the output at http://tests.nan-tic.com/%s" % public_path)
