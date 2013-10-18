@@ -1,13 +1,16 @@
 #!/usr/bin/python
 import ConfigParser
 import getpass
+import glob
 import logging
 import optparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime
 from email.mime.text import MIMEText
 from StringIO import StringIO
@@ -362,8 +365,17 @@ def runflakes(checker, trytond_path, branch, output_path):
         f.close()
 
 
+def clean_old_fetched_dirs(branch, days=3):
+    now = time.time()
+    for fullpath in glob.glob('/tmp/%s*' % branch):
+        if (os.stat(fullpath).st_mtime < (now - days * 24 * 60 * 60)
+                and os.path.isdir(fullpath)):
+            shutil.rmtree(fullpath)
+            logging.info('Removed %s path' % fullpath)
+
+
 def fetch(url, output_path, branch):
-    test_dir = tempfile.mkdtemp()
+    test_dir = tempfile.mkdtemp(prefix=branch)
     cwd = os.getcwd()
     logging.info('Cloning %s into %s' % (url, test_dir))
     output = 'Cloning %s into %s\n' % (url, test_dir)
@@ -404,7 +416,7 @@ if __name__ == "__main__":
     for branch, values in settings.iteritems():
         if options.branch and branch != options.branch:
             continue
-    
+
         now = datetime.now()
         logging.info("Starting runtests for branch '%s' with values '%s'"
             % (branch, values))
@@ -420,17 +432,19 @@ if __name__ == "__main__":
             public_path = os.path.dirname(output_path + "/")
             if 'html' in public_path.split('/')[-1]:
                 public_path = ''
-    
+
+            clean_old_fetched_dirs(branch)
+
             logging.debug("output_path='%s', values['url']='%s'"
                 % (output_path, values.get('url')))
             if values.get('url'):
                 values['trytond'], values['proteus'] = fetch(values['url'],
                     output_path, branch)
-    
+
             trytond_path = values['trytond']
             if not os.path.isdir(trytond_path):
                 continue
-    
+
             execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
             print execution_name
             pythonpath = [trytond_path]
