@@ -18,7 +18,9 @@ from StringIO import StringIO
 logging_filepath = "%s/logs/runtests.log" % os.getenv("HOME")
 logging.basicConfig(filename=logging_filepath,
     format='[%(asctime)s] %(levelname)s:%(message)s', level=logging.DEBUG)
-logging.info("Starting execution")
+
+logger = logging.getLogger('runtests')
+logger.info("Starting execution")
 
 parser = optparse.OptionParser()
 parser.add_option('-b', '--branch', dest='branch', help='specify branch')
@@ -35,7 +37,7 @@ parser.add_option('', '--failfast', action='store_true',
     dest='failfast')
 
 (options, _) = parser.parse_args()
-logging.debug("Options for args %s: %s" % (sys.argv, options))
+logger.debug("Options for args %s: %s" % (sys.argv, options))
 
 FLAKES_IGNORE_LIST = [
     "'suite' imported but unused",
@@ -122,7 +124,7 @@ rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
 parser = ConfigParser.ConfigParser()
 parser.read(rc_path)
 settings = get_settings(parser)
-logging.debug("settings: %s" % settings)
+logger.debug("settings: %s" % settings)
 
 if options.list:
     for branch in settings.keys():
@@ -136,11 +138,11 @@ def send_mail(subject, body, env=None):
     msg["To"] = "angel@nan-tic.com"
     msg["Subject"] = subject
 
-    logging.info("Sending mail '%s' to '%s'" % (subject, msg["To"]))
+    logger.info("Sending mail '%s' to '%s'" % (subject, msg["To"]))
     process = subprocess.Popen(["/usr/bin/mail", "-t"], env=env,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     data, stderr = process.communicate(msg.as_string())
-    logging.debug("send_mail(subject=%s): stderr=%s"
+    logger.debug("send_mail(subject=%s): stderr=%s"
         % (subject, stderr))
 
 
@@ -157,14 +159,15 @@ def check_output(args, env=None, errors=False):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     data, stderr = process.communicate()
-    logging.debug("process %s output: stderr='%s'"
+    logger.debug("process %s output: stderr='%s'"
         % (args, stderr))
     if errors:
         data += '-' * 50 + '\n' + stderr
     if stderr:
-        logging.error("Exception executing %s:\n%s" % (args, stderr))
+        logger.error("Exception executing %s:\n%s" % (args, stderr))
         raise Exception("Exception executing %s" % args)
     return data
+
 
 def runtest(path, branch, config, env, coverage, output_path, failfast=False):
     parameters = ['python', 'test.py', '--name', branch, '--config',
@@ -371,13 +374,13 @@ def clean_old_fetched_dirs(branch, days=3):
         if (os.stat(fullpath).st_mtime < (now - days * 24 * 60 * 60)
                 and os.path.isdir(fullpath)):
             shutil.rmtree(fullpath)
-            logging.info('Removed %s path' % fullpath)
+            logger.info('Removed %s path' % fullpath)
 
 
 def fetch(url, output_path, branch):
-    test_dir = tempfile.mkdtemp(prefix=branch)
+    test_dir = tempfile.mkdtemp(prefix=branch + '_')
     cwd = os.getcwd()
-    logging.info('Cloning %s into %s' % (url, test_dir))
+    logger.info('Cloning %s into %s' % (url, test_dir))
     output = 'Cloning %s into %s\n' % (url, test_dir)
     try:
         output += check_output(['hg', 'clone', url, test_dir], errors=True)
@@ -386,11 +389,11 @@ def fetch(url, output_path, branch):
         send_mail("[Tests] Error running hg clone", output)
 
     os.chdir(test_dir)
-    logging.info('Runninig ./bootstrap.sh')
+    logger.info('Runninig ./bootstrap.sh')
     output += '\nRunninig ./bootstrap.sh\n'
     try:
         output += check_output(['./bootstrap.sh'], errors=True)
-        logging.debug("./bootstrap.sh executed OK")
+        logger.debug("./bootstrap.sh executed OK")
     except Exception, e:
         output += '\nError runnig ./bootstrap.sh:\n' + str(e) + '\n'
         send_mail("[Tests] Error running ./bootstrap.sh", output)
@@ -418,7 +421,7 @@ if __name__ == "__main__":
             continue
 
         now = datetime.now()
-        logging.info("Starting runtests for branch '%s' with values '%s'"
+        logger.info("Starting runtests for branch '%s' with values '%s'"
             % (branch, values))
         try:
             if values.get('output'):
@@ -433,9 +436,15 @@ if __name__ == "__main__":
             if 'html' in public_path.split('/')[-1]:
                 public_path = ''
 
+            ch = logging.FileHandler(output_path + '/runtests.log')
+            ch.setLevel(logging.DEBUG)
+            ch.setFormatter(logging.Formatter(
+                    '[%(asctime)s] %(levelname)s:%(message)s'))
+            logger.addHandler(ch)
+
             clean_old_fetched_dirs(branch)
 
-            logging.debug("output_path='%s', values['url']='%s'"
+            logger.debug("output_path='%s', values['url']='%s'"
                 % (output_path, values.get('url')))
             if values.get('url'):
                 values['trytond'], values['proteus'] = fetch(values['url'],
