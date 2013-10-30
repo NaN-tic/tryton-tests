@@ -293,6 +293,8 @@ def runflakes(checker, trytond_path, branch, output_path):
     row += '<td>%(url)s</td>'
     row += '</tr>'
 
+    args = ['--ignore="E120,E121,E123,E124,E126,E127,E128,W0232,R0903"']
+
     total_modules = 0
     total_errors = 0
     rows = ''
@@ -304,7 +306,7 @@ def runflakes(checker, trytond_path, branch, output_path):
             continue
         dirs.append(p)
     for d in dirs:
-        parameters = [checker, d]
+        parameters = [checker, d ] + args
         output = check_output(parameters)
         module = os.path.basename(d)
         try:
@@ -463,7 +465,7 @@ if __name__ == "__main__":
                 'PYTHONPATH': ':'.join(pythonpath)
                 }
             if not options.unittest_only:
-                runflakes('pyflakes', trytond_path, branch, output_path)
+#                runflakes('pyflakes', trytond_path, branch, output_path)
                 runflakes('flake8', trytond_path, branch, output_path)
             if options.flakes_only:
                 continue
