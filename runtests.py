@@ -169,6 +169,20 @@ def check_output(args, env=None, errors=False):
     return data
 
 
+def get_module_key(filename):
+    uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
+    directory = os.path.dirname(filename)
+    i = 0
+    while not os.path.exists(os.path.join(directory,'tryton.cfg')):
+        if directory.split(os.sep)[-1] == 'trytond':
+            return False
+        i+=1
+        if i > 5:
+            return False
+        directory = uppath(directory,i)
+    return directory
+
+
 def runtest(path, branch, config, env, coverage, output_path, failfast=False):
     parameters = ['python', 'test.py', '--name', branch, '--config',
         '%s.conf' % config, '--output', output_path]
@@ -202,9 +216,12 @@ def runtest(path, branch, config, env, coverage, output_path, failfast=False):
             except ValueError:
                 continue
             covered = lines - uncovered
-            key = filename
-            if key.startswith(trytond_path):
-                key = key[len(trytond_path):]
+            #key = filename
+            key = get_module_key(filename)
+            if not key:
+                continue
+            #if key.startswith(trytond_path):
+            #    key = key[len(trytond_path):]
             if not key in records:
                 records[key] = (0, 0)
             lines += records[key][0]
