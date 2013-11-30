@@ -9,7 +9,7 @@ import optparse
 import functools
 import os
 import shutil
-    
+
 
 options = {}
 parser = optparse.OptionParser()
@@ -21,6 +21,8 @@ parser.add_option('', '--coverage', action='store_true', dest='coverage')
 parser.add_option('', '--coverage-dir', dest='coverage_dir')
 parser.add_option('', '--output', dest="output",
     help="directory where files should be stored to")
+parser.add_option('', '--nereid', dest="nereid",
+    help="path to nereid to add on pythonpath")
 parser.add_option('', '--failfast', action='store_true', dest='failfast',
     help="stop after the first error or failure")
 (opt, _) = parser.parse_args()
@@ -37,6 +39,7 @@ options['coverage'] = opt.coverage
 options['coverage_dir'] = opt.coverage_dir
 options['output'] = opt.output
 options['failfast'] = opt.failfast
+options['nereid'] = opt.nereid
 
 if options['coverage']:
     # If coverage is enabled we want to start
@@ -46,6 +49,7 @@ if options['coverage']:
     cov.start()
 
 sys.path.insert(0, 'trytond')
+sys.path.insert(0, options['nereid'])
 from trytond.config import CONFIG
 
 

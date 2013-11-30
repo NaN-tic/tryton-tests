@@ -13,7 +13,10 @@ import tempfile
 import time
 from datetime import datetime
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from StringIO import StringIO
+import smtplib
+
 
 logging_filepath = "%s/logs/runtests.log" % os.getenv("HOME")
 logging.basicConfig(filename=logging_filepath,
@@ -132,19 +135,30 @@ if options.list:
     sys.exit(0)
 
 
-def send_mail(subject, body, env=None):
-    msg = MIMEText(body)
-    msg["From"] = "tests@nan-tic.com"
-    msg["To"] = "angel@nan-tic.com"
-    msg["Subject"] = subject
+def send_mail(subject, body, log_file=None, files_dir=None):
 
-    logger.info("Sending mail '%s' to '%s'" % (subject, msg["To"]))
-    process = subprocess.Popen(["/usr/bin/mail", "-t"], env=env,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    data, stderr = process.communicate(msg.as_string())
-    logger.debug("send_mail(subject=%s): stderr=%s"
-        % (subject, stderr))
+    msg = MIMEMultipart('alternative')
+    me = "tests@nan-tic.com"
+    to = "developers@nan-tic.com"
 
+    msg['Subject'] = subject
+    msg['From'] = me
+    msg['To'] = to
+    msg.preamble = body
+
+    files = glob.glob("%s/*.html" % files_dir)
+    data = ""
+    for fl in sorted(files, reverse=True):
+        f = open(fl, 'r')
+        data += "<h1> %s </h1>" % fl
+        data += f.read()
+        f.close()
+    msg.attach(MIMEText(data, 'html'))
+
+    # Send the email via our own SMTP server.
+    s = smtplib.SMTP('localhost')
+    s.sendmail(me, to, msg.as_string())
+    s.quit()
 
 def html_filename(output_path, branch, config):
     filename = '%s-%s' % (branch, config)
@@ -183,9 +197,10 @@ def get_module_key(filename):
     return directory
 
 
-def runtest(path, branch, config, env, coverage, output_path, failfast=False):
+def runtest(path, branch, config, env, coverage, output_path, nereid_path,
+        failfast=False):
     parameters = ['python', 'test.py', '--name', branch, '--config',
-        '%s.conf' % config, '--output', output_path]
+        '%s.conf' % config, '--output', output_path, '--nereid', nereid_path]
     if failfast:
         parameters.append('--failfast')
     if coverage:
@@ -440,6 +455,8 @@ if __name__ == "__main__":
     for branch, values in settings.iteritems():
         if options.branch and branch != options.branch:
             continue
+        nereid_path = values.get('nereid')
+        sys.path.insert(0, nereid_path)
 
         now = datetime.now()
         logger.info("Starting runtests for branch '%s' with values '%s'"
@@ -476,7 +493,6 @@ if __name__ == "__main__":
                 continue
 
             execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
-            print execution_name
             pythonpath = [trytond_path]
             if 'proteus' in values:
                 pythonpath.append(values['proteus'])
@@ -490,15 +506,21 @@ if __name__ == "__main__":
                 continue
             if not options.pgsql_only:
                 runtest(trytond_path, branch, 'sqlite', env, options.coverage,
-                    output_path, options.failfast)
+                    output_path, nereid_path,  options.failfast)
             if not options.sqlite_only:
                 runtest(trytond_path, branch, 'postgres', env, options.coverage,
-                    output_path, options.failfast)
+                    output_path, nereid_path, options.failfast)
         except Exception as e:
             send_mail("[Tests] Error executing test %s" % execution_name,
                 "%s.\nMaybe there is any output at "
-                "http://tests.nan-tic.com/%s" % (str(e), public_path))
-            raise
+                "http://tests.nan-tic.com/%s" % (str(e), public_path),
+                ch.baseFilename, output_path)
         else:
-            send_mail("[Tests] Successful test execution %s" % execution_name,
-                "Check the output at http://tests.nan-tic.com/%s" % public_path)
+            filename = "%s/%s-sqlite.html" % (public_path, branch)
+            if not os.path.exists(filename):
+                send_mail("[Tests] Error executing test %s" % execution_name,"",
+                ch.baseFilename, output_path)
+            else:
+                send_mail("[Tests] Successful test execution %s" % execution_name,
+                "Check the output at http://tests.nan-tic.com/%s" % public_path,
+                          ch.baseFilename, output_path)
