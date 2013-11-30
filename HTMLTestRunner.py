@@ -403,10 +403,10 @@ h1 {
     REPORT_CLASS_TMPL = r"""
 <tr class='%(style)s'>
     <td>%(desc)s</td>
-    <td>%(count)s</td>
-    <td>%(Pass)s</td>
-    <td>%(fail)s</td>
-    <td>%(error)s</td>
+    <td id="total_count">%(count)s</td>
+    <td id="total_pass">%(Pass)s</td>
+    <td id="total_fail">%(fail)s</td>
+    <td id="total_error">%(error)s</td>
     <td><a href="javascript:showClassDetail('%(cid)s',%(count)s)">Detail</a></td>
 </tr>
 """ # variables: (style, desc, count, Pass, fail, error, cid)

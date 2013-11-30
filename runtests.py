@@ -139,7 +139,7 @@ def send_mail(subject, body, log_file=None, files_dir=None):
 
     msg = MIMEMultipart('alternative')
     me = "tests@nan-tic.com"
-    to = "developers@nan-tic.com"
+    to = "angel@nan-tic.com"
 
     msg['Subject'] = subject
     msg['From'] = me
@@ -450,6 +450,34 @@ def fetch(url, output_path, branch):
     # TODO: Currently we have hardcoded trytond and proteus subdirs
     return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus')
 
+def success(branch, ouput_path):
+    success=True
+
+    from BeautifulSoup import BeautifulSoup
+    #check sql_lite
+    sqllite_filename="%s/%s-sqlite.html" % (output_path, branch)
+    if not os.path.exists(sqllite_filename):
+        return False
+    sql_lite = open(sqllite_filename, 'r' ).read()
+    parsed_html = BeautifulSoup(sql_lite)
+    error = parsed_html.body.find(id='total_error')
+    fail = parsed_html.body.find(id='total_fail')
+
+    if error or fail:
+        success = False
+    #check postgresq
+    postgres_filename="%s/%s-postgresql.html" % (output_path, branch)
+    if not os.path.exists(postgres_filename):
+        return False
+    html = open(postgres_filename, 'r' ).read()
+    parsed_html = BeautifulSoup(html)
+    error = parsed_html.body.find(id='total_error')
+    fail = parsed_html.body.find(id='total_fail')
+    if error or fail:
+        success = False
+
+    return success
+
 
 if __name__ == "__main__":
     for branch, values in settings.iteritems():
@@ -516,8 +544,7 @@ if __name__ == "__main__":
                 "http://tests.nan-tic.com/%s" % (str(e), public_path),
                 ch.baseFilename, output_path)
         else:
-            filename = "%s/%s-sqlite.html" % (public_path, branch)
-            if not os.path.exists(filename):
+            if not success(branch, public_path):
                 send_mail("[Tests] Error executing test %s" % execution_name,"",
                 ch.baseFilename, output_path)
             else:
