@@ -448,7 +448,8 @@ def fetch(url, output_path, branch):
     finally:
         f.close()
     # TODO: Currently we have hardcoded trytond and proteus subdirs
-    return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus')
+    return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus'),
+        os.path.join(test_dir, 'nereid_app')
 
 def success(branch, ouput_path):
     success=True
@@ -513,8 +514,8 @@ if __name__ == "__main__":
             logger.debug("output_path='%s', values['url']='%s'"
                 % (output_path, values.get('url')))
             if values.get('url'):
-                values['trytond'], values['proteus'] = fetch(values['url'],
-                    output_path, branch)
+                values['trytond'], values['proteus'], values['nereid'] = \
+                        fetch(values['url'], output_path, branch)
 
             trytond_path = values['trytond']
             if not os.path.isdir(trytond_path):
@@ -524,6 +525,9 @@ if __name__ == "__main__":
             pythonpath = [trytond_path]
             if 'proteus' in values:
                 pythonpath.append(values['proteus'])
+
+            if 'nereid' in values:
+                pythonpath.append(values['nereid'])
             env = {
                 'PYTHONPATH': ':'.join(pythonpath)
                 }
