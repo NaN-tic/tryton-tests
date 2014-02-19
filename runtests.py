@@ -18,7 +18,7 @@ from StringIO import StringIO
 import smtplib
 
 
-logging_filepath = "%s/logs/runtests.log" % os.getenv("HOME")
+logging_filepath = "./logs/runtests.log"
 logging.basicConfig(filename=logging_filepath,
     format='[%(asctime)s] %(levelname)s:%(message)s', level=logging.DEBUG)
 
@@ -122,7 +122,7 @@ def get_settings(parser):
 
 exec_path = os.getcwd()
 menu_path = os.path.split(__file__)[0]
-rc_path = '%s/.tryton-tests.cfg' % os.getenv('HOME')
+rc_path = './tryton-tests.cfg'
 
 parser = ConfigParser.ConfigParser()
 parser.read(rc_path)
@@ -199,8 +199,9 @@ def get_module_key(filename):
 
 def runtest(path, branch, config, env, coverage, output_path, nereid_path,
         failfast=False):
-    parameters = ['python', 'test.py', '--name', branch, '--config',
-        '%s.conf' % config, '--output', output_path, '--nereid', nereid_path]
+    pp = os.path.dirname(os.path.realpath(__file__))
+    parameters = ['python', pp+'/test.py', '--name', branch, '--config',
+        pp+'/%s.conf' % config, '--output', output_path, '--nereid', nereid_path]
     if failfast:
         parameters.append('--failfast')
     if coverage:
@@ -448,8 +449,9 @@ def fetch(url, output_path, branch):
     finally:
         f.close()
     # TODO: Currently we have hardcoded trytond and proteus subdirs
-    return os.path.join(test_dir, 'trytond'), os.path.join(test_dir, 'proteus'),
-        os.path.join(test_dir, 'nereid_app')
+    return (os.path.join(test_dir, 'trytond'),
+            os.path.join(test_dir, 'proteus'),
+            os.path.join(test_dir, 'nereid_app'))
 
 def success(branch, ouput_path):
     success=True

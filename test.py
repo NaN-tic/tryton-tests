@@ -26,6 +26,7 @@ parser.add_option('', '--nereid', dest="nereid",
 parser.add_option('', '--failfast', action='store_true', dest='failfast',
     help="stop after the first error or failure")
 (opt, _) = parser.parse_args()
+
 if opt.config:
     options['configfile'] = opt.config
 else:
@@ -48,8 +49,8 @@ if options['coverage']:
     cov = coverage()
     cov.start()
 
-sys.path.insert(0, 'trytond')
-sys.path.insert(0, options['nereid'])
+#sys.path.insert(0, 'trytond')
+#sys.path.insert(0, options['nereid'])
 from trytond.config import CONFIG
 
 
@@ -71,7 +72,7 @@ basename += CONFIG['db_type']
 if options.get('output'):
     path = options['output']
 else:
-    path = '/home/%s/public_html' % getpass.getuser()
+    path = './%s/public_html' % getpass.getuser()
 filename = '%s/%s.html' % (path, basename)
 title = 'Tryton unittest %s' % CONFIG['db_type']
 
