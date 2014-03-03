@@ -166,7 +166,10 @@ def html_filename(output_path, branch, config):
     return filename
 
 def run(args, env):
-    process = subprocess.Popen(args, env=env)
+    if os.environ.get('VIRTUAL_ENV'):
+        process = subprocess.Popen(args)
+    else:
+        process = subprocess.Popen(args, env=env)
     process.wait()
 
 def check_output(args, env=None, errors=False):
