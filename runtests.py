@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -156,9 +157,16 @@ def send_mail(subject, body, log_file=None, files_dir=None):
     msg.attach(MIMEText(data, 'html'))
 
     # Send the email via our own SMTP server.
-    s = smtplib.SMTP('localhost')
-    s.sendmail(me, to, msg.as_string())
-    s.quit()
+    logger.debug('Sending e-mail "%s" from "%s" to "%s" with body: %s'
+        % (subject, me, to, body))
+    try:
+        s = smtplib.SMTP('localhost')
+        s.sendmail(me, to, msg.as_string())
+        s.quit()
+    except Exception, e:
+        logger.error('Exception %s (%s) sending e-mail "%s" to %s:\n%s\%s'
+            % (e, type(e), subject, to, body,
+                "".join(traceback.format_stack())))
 
 def html_filename(output_path, branch, config):
     filename = '%s-%s' % (branch, config)
@@ -524,6 +532,8 @@ if __name__ == "__main__":
 
             trytond_path = values['trytond']
             if not os.path.isdir(trytond_path):
+                logger.warning("trytond path '%s' not found. Ignoring "
+                    "execution" % values['trytond'])
                 continue
 
             execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
