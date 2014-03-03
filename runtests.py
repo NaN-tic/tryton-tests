@@ -168,10 +168,12 @@ def send_mail(subject, body, log_file=None, files_dir=None):
             % (e, type(e), subject, to, body,
                 "".join(traceback.format_stack())))
 
+
 def html_filename(output_path, branch, config):
     filename = '%s-%s' % (branch, config)
     filename = '%s/%s.html' % (output_path, filename)
     return filename
+
 
 def run(args, env):
     if os.environ.get('VIRTUAL_ENV'):
@@ -179,6 +181,7 @@ def run(args, env):
     else:
         process = subprocess.Popen(args, env=env)
     process.wait()
+
 
 def check_output(args, env=None, errors=False):
     process = subprocess.Popen(args, env=env, stdout=subprocess.PIPE,
@@ -198,21 +201,22 @@ def get_module_key(filename):
     uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
     directory = os.path.dirname(filename)
     i = 0
-    while not os.path.exists(os.path.join(directory,'tryton.cfg')):
+    while not os.path.exists(os.path.join(directory, 'tryton.cfg')):
         if directory.split(os.sep)[-1] == 'trytond':
             return False
-        i+=1
+        i += 1
         if i > 5:
             return False
-        directory = uppath(directory,i)
+        directory = uppath(directory, i)
     return directory
 
 
 def runtest(path, branch, config, env, coverage, output_path, nereid_path,
         failfast=False):
     pp = os.path.dirname(os.path.realpath(__file__))
-    parameters = ['python', pp+'/test.py', '--name', branch, '--config',
-        pp+'/%s.conf' % config, '--output', output_path, '--nereid', nereid_path]
+    parameters = ['python', pp + '/test.py', '--name', branch, '--config',
+        pp + '/%s.conf' % config, '--output', output_path, '--nereid',
+        nereid_path]
     if failfast:
         parameters.append('--failfast')
     if coverage:
@@ -352,7 +356,7 @@ def runflakes(checker, trytond_path, branch, output_path):
             continue
         dirs.append(p)
     for d in dirs:
-        parameters = [checker, d ] + args
+        parameters = [checker, d] + args
         output = check_output(parameters)
         module = os.path.basename(d)
         try:
@@ -464,15 +468,16 @@ def fetch(url, output_path, branch):
             os.path.join(test_dir, 'proteus'),
             os.path.join(test_dir, 'nereid_app'))
 
+
 def success(branch, ouput_path):
-    success=True
+    success = True
 
     from BeautifulSoup import BeautifulSoup
     #check sql_lite
-    sqllite_filename="%s/%s-sqlite.html" % (output_path, branch)
+    sqllite_filename = "%s/%s-sqlite.html" % (output_path, branch)
     if not os.path.exists(sqllite_filename):
         return False
-    sql_lite = open(sqllite_filename, 'r' ).read()
+    sql_lite = open(sqllite_filename, 'r').read()
     parsed_html = BeautifulSoup(sql_lite)
     error = parsed_html.body.find(id='total_error')
     fail = parsed_html.body.find(id='total_fail')
@@ -480,10 +485,10 @@ def success(branch, ouput_path):
     if error or fail:
         success = False
     #check postgresq
-    postgres_filename="%s/%s-postgresql.html" % (output_path, branch)
+    postgres_filename = "%s/%s-postgresql.html" % (output_path, branch)
     if not os.path.exists(postgres_filename):
         return False
-    html = open(postgres_filename, 'r' ).read()
+    html = open(postgres_filename, 'r').read()
     parsed_html = BeautifulSoup(html)
     error = parsed_html.body.find(id='total_error')
     fail = parsed_html.body.find(id='total_fail')
@@ -536,7 +541,8 @@ if __name__ == "__main__":
                     "execution" % values['trytond'])
                 continue
 
-            execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'), branch)
+            execution_name = "%s %s" % (now.strftime('%Y-%m-%d %H:%M:%S'),
+                branch)
             pythonpath = [trytond_path]
             if 'proteus' in values:
                 pythonpath.append(values['proteus'])
@@ -553,10 +559,11 @@ if __name__ == "__main__":
                 continue
             if not options.pgsql_only:
                 runtest(trytond_path, branch, 'sqlite', env, options.coverage,
-                    output_path, nereid_path,  options.failfast)
-            if not options.sqlite_only:
-                runtest(trytond_path, branch, 'postgres', env, options.coverage,
                     output_path, nereid_path, options.failfast)
+            if not options.sqlite_only:
+                runtest(trytond_path, branch, 'postgres', env,
+                    options.coverage, output_path, nereid_path,
+                    options.failfast)
         except Exception as e:
             send_mail("[Tests] Error executing test %s" % execution_name,
                 "%s.\nMaybe there is any output at "
@@ -564,9 +571,10 @@ if __name__ == "__main__":
                 ch.baseFilename, output_path)
         else:
             if not success(branch, public_path):
-                send_mail("[Tests] Error executing test %s" % execution_name,"",
-                ch.baseFilename, output_path)
+                send_mail("[Tests] Error executing test %s" % execution_name,
+                    "", ch.baseFilename, output_path)
             else:
-                send_mail("[Tests] Successful test execution %s" % execution_name,
-                "Check the output at http://tests.nan-tic.com/%s" % public_path,
-                          ch.baseFilename, output_path)
+                send_mail("[Tests] Successful test execution %s"
+                    % execution_name,
+                    "Check the output at http://tests.nan-tic.com/%s"
+                    % public_path, ch.baseFilename, output_path)
