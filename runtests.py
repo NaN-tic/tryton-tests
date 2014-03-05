@@ -19,7 +19,11 @@ from StringIO import StringIO
 import smtplib
 
 
-logging_filepath = "./logs/runtests.log"
+logging_path = "./logs"
+logging_filepath = os.path.join(logging_path, "runtests.log")
+if not(os.path.exists(logging_path)):
+    os.mkdir(logging_path)
+
 logging.basicConfig(filename=logging_filepath,
     format='[%(asctime)s] %(levelname)s:%(message)s', level=logging.DEBUG)
 
