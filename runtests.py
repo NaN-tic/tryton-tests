@@ -144,7 +144,7 @@ def send_mail(subject, body, log_file=None, files_dir=None):
 
     msg = MIMEMultipart('alternative')
     me = "tests@nan-tic.com"
-    to = "intern@nan-tic.com"
+    to = "developers@nan-tic.com"
 
     msg['Subject'] = subject
     msg['From'] = me
